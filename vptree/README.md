@@ -1,6 +1,6 @@
 Go package
 
-- [movingminmax](http://godoc.org/github.com/notnot/search/vptree) : Vantage point tree for efficient k-nearest neighbor and range searches.
+- [vptree](http://godoc.org/github.com/notnot/search/vptree) : Vantage point tree for efficient k-nearest neighbor and range searches.
 
 Implements the algorithm from:
 "Data Structures and Algorithms for Nearest Neighbor Search in General Metric Spaces"
