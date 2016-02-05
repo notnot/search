@@ -191,49 +191,34 @@ func (t *VPTree) build(points []Point) *node {
 }
 
 // recursive nearest neighbor search
-// TODO: try avoiding recursion to nil child nodes, could be faster?
 func (t *VPTree) nn(n *node, τ *float32, query Point, min *_Item) {
-	if n == nil {
-		return // empty tree: end recursion
-	}
-
 	d := n.p.Distance(query)
 	if d < *τ {
 		min.p = n.p
 		min.d = d
 		*τ = d
 	}
-
-	if n.inside == nil && n.outside == nil {
-		return // leaf node: end recursion
-	}
-
 	if d < n.boundary {
-		if d-*τ <= n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
 			t.nn(n.inside, τ, query, min)
 		}
-		if d+*τ >= n.boundary {
+		if n.outside != nil && d+*τ >= n.boundary {
 			t.nn(n.outside, τ, query, min)
 		}
 	} else {
-		if d+*τ >= n.boundary {
+		if n.outside != nil && d+*τ >= n.boundary {
 			t.nn(n.outside, τ, query, min)
 		}
-		if d-*τ <= n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
 			t.nn(n.inside, τ, query, min)
 		}
 	}
 }
 
 // recursive nearest neighbors search
-// TODO: try avoiding recursion to nil child nodes, could be faster?
 func (t *VPTree) kNN(
 	n *node, τ *float32, query Point, k int, pq *priorityQueue,
 ) {
-	if n == nil {
-		return // empty tree: end recursion
-	}
-
 	d := n.p.Distance(query)
 	if d < *τ {
 		if pq.Len() == k {
@@ -244,58 +229,43 @@ func (t *VPTree) kNN(
 			*τ = pq.Top().(*_Item).d
 		}
 	}
-
-	if n.inside == nil && n.outside == nil {
-		return // leaf node: end recursion
-	}
-
 	if d < n.boundary {
-		if d-*τ <= n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
 			t.kNN(n.inside, τ, query, k, pq)
 		}
-		if d+*τ >= n.boundary {
+		if n.outside != nil && d+*τ >= n.boundary {
 			t.kNN(n.outside, τ, query, k, pq)
 		}
 	} else {
-		if d+*τ >= n.boundary {
+		if n.outside != nil && d+*τ >= n.boundary {
 			t.kNN(n.outside, τ, query, k, pq)
 		}
-		if d-*τ <= n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
 			t.kNN(n.inside, τ, query, k, pq)
 		}
 	}
 }
 
 // recursive range search
-// TODO: try avoiding recursion to nil child nodes, could be faster?
 func (t *VPTree) rangeNN(
 	n *node, τ *float32, query Point, pq *priorityQueue,
 ) {
-	if n == nil {
-		return // empty tree: end recursion
-	}
-
 	d := n.p.Distance(query)
 	if d <= *τ {
 		heap.Push(pq, &_Item{n.p, d})
 	}
-
-	if n.inside == nil && n.outside == nil {
-		return // leaf node: end recursion
-	}
-
 	if d < n.boundary {
-		if d-*τ <= n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
 			t.rangeNN(n.inside, τ, query, pq)
 		}
-		if d+*τ >= n.boundary {
+		if n.outside != nil && d+*τ >= n.boundary {
 			t.rangeNN(n.outside, τ, query, pq)
 		}
 	} else {
-		if d+*τ >= n.boundary {
+		if n.outside != nil && d+*τ >= n.boundary {
 			t.rangeNN(n.outside, τ, query, pq)
 		}
-		if d-*τ <= n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
 			t.rangeNN(n.inside, τ, query, pq)
 		}
 	}
