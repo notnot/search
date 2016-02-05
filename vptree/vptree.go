@@ -43,30 +43,30 @@ type Point interface {
 type VPTree struct {
 	root *node
 
-	seed uint64
-	rnd  *rand.Rand
+	rnd     *rand.Rand
+	nTrials uint
+	dbuf    []float32 // trial distance buffer
 }
 
-// NewVPTree returns an initialized tree holding the given points. The search
-// performance of a tree varies with the queries used and the vantage point
-// layout, but no heuristics are known to create an ideally efficient vp-tree.
-// Therefore the vantage points are chosen randomly, and the random number
-// generator seed can be specified, to be able to try multiple variants and
-// pick the fastest.
-func NewVPTree(points []Point, seed uint64) *VPTree {
+// NewVPTree returns an initialized tree holding the given points. If desired
+// the tree is optimized by trial and error for efficient search by finding the
+// best vantage point layout. The higher nTrials is, the faster the search
+// performance, but the slower the tree initialization.
+func NewVPTree(points []Point, nTrials uint) *VPTree {
 	// points will be reordered, make a working copy
 	_points := make([]Point, len(points))
 	copy(_points, points)
 
 	tree := &VPTree{
-		seed: seed,
-		rnd:  rand.New(rand.NewSource(int64(seed))),
+		rnd:     rand.New(rand.NewSource(1234567890)),
+		nTrials: nTrials,
+		dbuf:    make([]float32, nTrials),
 	}
 	tree.root = tree.build(_points)
 	return tree
 }
 
-// String returns a textual rendering of the tree.
+// String returns a textual rendering of the tree. Warning: output can be huge!
 func (t *VPTree) String() string {
 	var print func(*node, uint, *[]byte)
 	print = func(n *node, depth uint, txt *[]byte) {
@@ -131,6 +131,7 @@ func (t *VPTree) RangeNN(query Point, r float32) ([]Point, []float32) {
 	return extractReverse(pq)
 }
 
+// Info returns basic structural information about the vp-tree.
 func (t *VPTree) Info() Info {
 	info := Info{}
 
@@ -170,7 +171,7 @@ func (t *VPTree) build(points []Point) *node {
 		n.p = points[0]
 		points = points[1:] // remove point 0
 	} else {
-		i := t.rnd.Intn(len(points))
+		i := t.chooseVantagePoint(points)
 		n.p = points[i]
 		last := len(points) - 1
 		points[i], points = points[last], points[:last] // remove point i
@@ -190,6 +191,7 @@ func (t *VPTree) build(points []Point) *node {
 }
 
 // recursive nearest neighbor search
+// TODO: try avoiding recursion to nil child nodes, could be faster?
 func (t *VPTree) nn(n *node, τ *float32, query Point, min *_Item) {
 	if n == nil {
 		return // empty tree: end recursion
@@ -224,6 +226,7 @@ func (t *VPTree) nn(n *node, τ *float32, query Point, min *_Item) {
 }
 
 // recursive nearest neighbors search
+// TODO: try avoiding recursion to nil child nodes, could be faster?
 func (t *VPTree) kNN(
 	n *node, τ *float32, query Point, k int, pq *priorityQueue,
 ) {
@@ -264,6 +267,7 @@ func (t *VPTree) kNN(
 }
 
 // recursive range search
+// TODO: try avoiding recursion to nil child nodes, could be faster?
 func (t *VPTree) rangeNN(
 	n *node, τ *float32, query Point, pq *priorityQueue,
 ) {
@@ -295,6 +299,59 @@ func (t *VPTree) rangeNN(
 			t.rangeNN(n.inside, τ, query, pq)
 		}
 	}
+}
+
+// chooseVantagePoint returns the index of the chosen (best) vantage point.
+// An ideal vantage point is a point which distances to the other points have
+// the maximal standard deviation. To find such a point, a number of trials is
+// performed, where a random subset of the input points is tested with a random
+// vantage point.
+//
+// TODO: choose proper subset by index shuffling, then take first n indices
+// TODO: emumerate permutations of small sets of points?
+func (t *VPTree) chooseVantagePoint(points []Point) uint {
+	n := uint(len(points))
+	if n <= 2 {
+		// if there is only 1 point, return it
+		// if there are only two points, it doesn't matter, return the first
+		return 0
+	}
+	// limit the number of trials to the number of points
+	nTrials := t.nTrials
+	if n < nTrials {
+		nTrials = n
+	}
+
+	max := float32(0.0) // init to min
+	imax := uint(0)     // index of max distant vantage point
+	ivp := uint(0)      // index of vantage point
+
+	for trial := uint(0); trial < nTrials; trial++ {
+		// random vantage point
+		ivp = uint(t.rnd.Intn(int(n)))
+		vp := points[ivp]
+		// distances to random subset of points, and their mean
+		mean := float32(0.0)
+		for test := uint(0); test < nTrials; test++ {
+			p := points[rand.Intn(int(n))] // random point
+			dist := vp.Distance(p)
+			t.dbuf[test] = dist
+			mean += dist
+		}
+		mean /= float32(nTrials)
+		// deviation
+		dev := float32(0.0)
+		for i := uint(0); i < nTrials; i++ {
+			d := t.dbuf[i] - mean
+			dev += d * d
+		}
+		// track deviation maximum
+		if dev > max {
+			max = dev
+			imax = ivp
+		}
+	}
+	return imax
 }
 
 //// utilities /////////////////////////////////////////////////////////////////
