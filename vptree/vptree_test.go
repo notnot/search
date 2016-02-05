@@ -106,9 +106,8 @@ func init() {
 /*
 func TestDemo(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		fmt.Printf("seed %d\n", i)
-		vp := NewVPTree(set1D, uint64(i))
-		//vp := NewVPTree(isamples, uint64(i))
+		vp := NewVPTree(set1D, uint(i))
+		//vp := NewVPTree(isamples, uint(i))
 		info := vp.Info()
 
 		fmt.Printf("\n%s\n", vp)
@@ -174,7 +173,7 @@ func TestDataset(t *testing.T) {
 // zero results should be returned
 func TestEmpty(t *testing.T) {
 	query := Point(&point{0.0})
-	vp := NewVPTree(nil, 0)
+	vp := NewVPTree(nil, 1)
 
 	nn, dists := vp.KNN(query, 1)
 	if len(nn) != 0 || len(dists) != 0 {
@@ -191,7 +190,7 @@ func TestKgreaterthanN(t *testing.T) {
 		&point{1.0, 2.0, 3.0},
 		&point{2.0, 3.0, 4.0},
 	}
-	vp := NewVPTree(samples, 0)
+	vp := NewVPTree(samples, 1)
 
 	nn, dists := vp.KNN(query, 10)
 	if len(nn) != len(samples) || len(dists) != len(samples) {
@@ -207,7 +206,7 @@ func TestTies(t *testing.T) {
 		&point{1.0, 0.0},
 		&point{0.0, 1.0},
 	}
-	vp := NewVPTree(samples, 0)
+	vp := NewVPTree(samples, 1)
 
 	nn, dists := vp.KNN(query, 1)
 	if len(nn) != 1 || len(dists) != 1 {
@@ -222,7 +221,7 @@ func TestDuplicates(t *testing.T) {
 	samples := []Point{
 		&point{1.0}, &point{2.0}, &point{2.0}, &point{3.0},
 	}
-	vp := NewVPTree(samples, 0)
+	vp := NewVPTree(samples, 1)
 
 	k := len(samples)
 	nn, dists := vp.KNN(query, k)
@@ -233,7 +232,7 @@ func TestDuplicates(t *testing.T) {
 
 // test NN on random samples
 func TestRandomNN(t *testing.T) {
-	vp := NewVPTree(isamples, 123)
+	vp := NewVPTree(isamples, 1)
 
 	for i := range iqueries {
 		nnRef, distsRef := kNN_linear(isamples, iqueries[i], 1)
@@ -247,7 +246,7 @@ func TestRandomNN(t *testing.T) {
 
 // test kNN on random samples
 func TestRandomKNN(t *testing.T) {
-	vp := NewVPTree(isamples, 123)
+	vp := NewVPTree(isamples, 1)
 	k := 10
 
 	for i := range iqueries {
@@ -262,7 +261,7 @@ func TestRandomKNN(t *testing.T) {
 
 // test RangeNN on random samples
 func TestRandomRangeNN(t *testing.T) {
-	vp := NewVPTree(isamples, 123)
+	vp := NewVPTree(isamples, 1)
 	r := float32(1.0)
 
 	for i := range iqueries {
@@ -298,14 +297,38 @@ func BenchmarkNothing(b *testing.B) {
 	}
 }
 
-func BenchmarkNewVPTree(b *testing.B) {
+func BenchmarkNewVPTree_0(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = NewVPTree(isamples, 0)
 	}
 }
 
+func BenchmarkNewVPTree_1(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NewVPTree(isamples, 1)
+	}
+}
+
+func BenchmarkNewVPTree_4(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NewVPTree(isamples, 4)
+	}
+}
+
+func BenchmarkNewVPTree_16(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NewVPTree(isamples, 16)
+	}
+}
+
+func BenchmarkNewVPTree_64(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = NewVPTree(isamples, 64)
+	}
+}
+
 func Benchmark1NN(b *testing.B) {
-	vp := NewVPTree(isamples, 1)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -315,7 +338,7 @@ func Benchmark1NN(b *testing.B) {
 }
 
 func Benchmark2NN(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -325,7 +348,7 @@ func Benchmark2NN(b *testing.B) {
 }
 
 func Benchmark4NN(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -335,7 +358,7 @@ func Benchmark4NN(b *testing.B) {
 }
 
 func Benchmark8NN(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -345,7 +368,7 @@ func Benchmark8NN(b *testing.B) {
 }
 
 func BenchmarkNN(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -355,7 +378,7 @@ func BenchmarkNN(b *testing.B) {
 }
 
 func BenchmarkRange01(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -365,7 +388,7 @@ func BenchmarkRange01(b *testing.B) {
 }
 
 func BenchmarkRange02(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -375,7 +398,7 @@ func BenchmarkRange02(b *testing.B) {
 }
 
 func BenchmarkRange04(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
@@ -385,7 +408,7 @@ func BenchmarkRange04(b *testing.B) {
 }
 
 func BenchmarkRange08(b *testing.B) {
-	vp := NewVPTree(isamples, 0)
+	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
