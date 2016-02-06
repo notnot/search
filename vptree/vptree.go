@@ -1,10 +1,10 @@
 // vptree.go, jpad 2016
 
 /*
-Package vptree implements a 'vantage point tree' for exact nearest neighbor
-searches. The dataset consists of n d-dimensional points in a metric space.
-Points with identical positions are treated as unique entities. Any datatype
-that implements the Point interface can be handled.
+Package vptree implements a 'vantage point tree' for exact or approximate
+nearest neighbor and range searches. The dataset consists of n d-dimensional
+points in a metric space. Points with identical positions are treated as unique
+entities. Any datatype that implements the Point interface can be handled.
 
 See http://web.cs.iastate.edu/~honavar/nndatastructures.pdf :
 "Data Structures and Algorithms for Nearest Neighbor Search
@@ -87,7 +87,7 @@ func (t *VPTree) String() string {
 	return string(text)
 }
 
-// NN returns the nearest neighbor to the query point, together with its
+// NN returns the exact nearest neighbor to the query point, together with its
 // distance.
 func (t *VPTree) NN(query Point) (Point, float32) {
 	τ := float32(math.MaxFloat32)
@@ -97,9 +97,9 @@ func (t *VPTree) NN(query Point) (Point, float32) {
 	return min.p, min.d
 }
 
-// KNN returns the k nearest neighbors to the query point, together with their
-// respective distances. The results are sorted from nearest to farthest. If
-// k > total number of samples in the tree, k is limited to the total number
+// KNN returns the exact k nearest neighbors to the query point, together with
+// their respective distances. The results are sorted from nearest to farthest.
+// If k > total number of samples in the tree, k is limited to the total number
 // of samples. When there is a tie for the farthest of the nearest neighbors,
 // k won't increase to always return all of them.
 func (t *VPTree) KNN(query Point, k int) ([]Point, []float32) {
@@ -133,8 +133,6 @@ func (t *VPTree) RangeNN(query Point, r float32) ([]Point, []float32) {
 
 // Info returns basic structural information about the vp-tree.
 func (t *VPTree) Info() Info {
-	info := Info{}
-
 	var getInfo func(*node, uint, *Info)
 	getInfo = func(n *node, depth uint, info *Info) {
 		if n == nil {
@@ -147,12 +145,12 @@ func (t *VPTree) Info() Info {
 		if depth > info.MaxDepth {
 			info.MaxDepth = depth
 		}
-
 		// process child nodes
 		getInfo(n.inside, depth+1, info)
 		getInfo(n.outside, depth+1, info)
 	}
 
+	info := Info{}
 	getInfo(t.root, 0, &info)
 	return info
 }
@@ -278,7 +276,7 @@ func (t *VPTree) rangeNN(
 // vantage point.
 //
 // TODO: choose proper subset by index shuffling, then take first n indices
-// TODO: emumerate permutations of small sets of points?
+// TODO: test all permutations of small sets of points?
 func (t *VPTree) chooseVantagePoint(points []Point) uint {
 	n := uint(len(points))
 	if n <= 2 {
