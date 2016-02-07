@@ -32,6 +32,9 @@ import (
 //	d(x, y) = 0 if and only if x == y
 //	d(x, y) = d(y, x)
 //	d(x, z) <= d(x, y) + d(y, z) (triangle inequality)
+//
+// Manhattan (Lⁱ norm) or Euclidian (L² norm) metrics are suitable. Using
+// squared distances won't work as this violates the triangle equality.
 type Point interface {
 	// Distance returns the distance between the receiver and p.
 	Distance(p Point) float32
@@ -44,7 +47,7 @@ type VPTree struct {
 	root *node
 
 	rnd     *rand.Rand
-	nTrials uint
+	nTrials int
 	dbuf    []float32 // trial distance buffer
 }
 
@@ -52,7 +55,7 @@ type VPTree struct {
 // the tree is optimized by trial and error for efficient search by finding the
 // best vantage point layout. The higher nTrials is, the faster the search
 // performance, but the slower the tree initialization.
-func NewVPTree(points []Point, nTrials uint) *VPTree {
+func NewVPTree(points []Point, nTrials int) *VPTree {
 	// points will be reordered, make a working copy
 	_points := make([]Point, len(points))
 	copy(_points, points)
@@ -131,10 +134,33 @@ func (t *VPTree) RangeNN(query Point, r float32) ([]Point, []float32) {
 	return extractReverse(pq)
 }
 
+// ApproximateKNN returns the approximate k nearest neighbors to the query
+// point, together with their respective distances. The nn parameter
+// specifies the maximal number of nodes that are visited during the search,
+// and can thus be used to limit the time spent searching.
+// The results are sorted from nearest to farthest. If k > total number of
+// samples in the tree, k is limited to the total number of samples.
+func (t *VPTree) ApproximateKNN(query Point, k, nn int) ([]Point, []float32) {
+	if nn == 0 || t.root == nil {
+		return []Point{}, []float32{}
+	}
+
+	τ := float32(math.MaxFloat32)
+	pq := make(priorityQueue, 0, k) // priority queue
+	info := approxInfo{
+		k:     k,
+		nn:    nn,
+		count: 0,
+	}
+	t.approximateKNN(t.root, &τ, query, &info, &pq)
+
+	return extractReverse(pq)
+}
+
 // Info returns basic structural information about the vp-tree.
 func (t *VPTree) Info() Info {
-	var getInfo func(*node, uint, *Info)
-	getInfo = func(n *node, depth uint, info *Info) {
+	var getInfo func(*node, int, *Info)
+	getInfo = func(n *node, depth int, info *Info) {
 		if n == nil {
 			return
 		}
@@ -188,7 +214,7 @@ func (t *VPTree) build(points []Point) *node {
 	return n
 }
 
-// recursive nearest neighbor search
+// recursive exact nearest neighbor search
 func (t *VPTree) nn(n *node, τ *float32, query Point, min *_Item) {
 	d := n.p.Distance(query)
 	if d < *τ {
@@ -213,7 +239,7 @@ func (t *VPTree) nn(n *node, τ *float32, query Point, min *_Item) {
 	}
 }
 
-// recursive nearest neighbors search
+// recursive exact nearest neighbors search
 func (t *VPTree) kNN(
 	n *node, τ *float32, query Point, k int, pq *priorityQueue,
 ) {
@@ -269,6 +295,43 @@ func (t *VPTree) rangeNN(
 	}
 }
 
+// recursive approximate nearest neighbors search
+func (t *VPTree) approximateKNN(
+	n *node, τ *float32, query Point, info *approxInfo, pq *priorityQueue,
+) {
+	if info.count >= info.nn {
+		return // number of nodes visited >= limit
+	}
+	info.count++
+
+	d := n.p.Distance(query)
+	if d < *τ {
+		if pq.Len() == info.k {
+			heap.Pop(pq)
+		}
+		heap.Push(pq, &_Item{n.p, d})
+		if pq.Len() == info.k {
+			*τ = pq.Top().(*_Item).d
+		}
+	}
+
+	if d < n.boundary {
+		if n.inside != nil && d-*τ <= n.boundary {
+			t.approximateKNN(n.inside, τ, query, info, pq)
+		}
+		if n.outside != nil && d+*τ >= n.boundary {
+			t.approximateKNN(n.outside, τ, query, info, pq)
+		}
+	} else {
+		if n.outside != nil && d+*τ >= n.boundary {
+			t.approximateKNN(n.outside, τ, query, info, pq)
+		}
+		if n.inside != nil && d-*τ <= n.boundary {
+			t.approximateKNN(n.inside, τ, query, info, pq)
+		}
+	}
+}
+
 // chooseVantagePoint returns the index of the chosen (best) vantage point.
 // An ideal vantage point is a point which distances to the other points have
 // the maximal standard deviation. To find such a point, a number of trials is
@@ -277,8 +340,8 @@ func (t *VPTree) rangeNN(
 //
 // TODO: choose proper subset by index shuffling, then take first n indices
 // TODO: test all permutations of small sets of points?
-func (t *VPTree) chooseVantagePoint(points []Point) uint {
-	n := uint(len(points))
+func (t *VPTree) chooseVantagePoint(points []Point) int {
+	n := len(points)
 	if n <= 2 {
 		// if there is only 1 point, return it
 		// if there are only two points, it doesn't matter, return the first
@@ -291,17 +354,17 @@ func (t *VPTree) chooseVantagePoint(points []Point) uint {
 	}
 
 	max := float32(0.0) // init to min
-	imax := uint(0)     // index of max distant vantage point
-	ivp := uint(0)      // index of vantage point
+	imax := 0           // index of max distant vantage point
+	ivp := 0            // index of vantage point
 
-	for trial := uint(0); trial < nTrials; trial++ {
+	for trial := 0; trial < nTrials; trial++ {
 		// random vantage point
-		ivp = uint(t.rnd.Intn(int(n)))
+		ivp = t.rnd.Intn(n)
 		vp := points[ivp]
 		// distances to random subset of points, and their mean
 		mean := float32(0.0)
-		for test := uint(0); test < nTrials; test++ {
-			p := points[rand.Intn(int(n))] // random point
+		for test := 0; test < nTrials; test++ {
+			p := points[rand.Intn(n)] // random point
 			dist := vp.Distance(p)
 			t.dbuf[test] = dist
 			mean += dist
@@ -309,7 +372,7 @@ func (t *VPTree) chooseVantagePoint(points []Point) uint {
 		mean /= float32(nTrials)
 		// deviation
 		dev := float32(0.0)
-		for i := uint(0); i < nTrials; i++ {
+		for i := 0; i < nTrials; i++ {
 			d := t.dbuf[i] - mean
 			dev += d * d
 		}

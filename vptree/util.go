@@ -11,9 +11,9 @@ import (
 
 // Info contains structural information about a vp-tree.
 type Info struct {
-	NNodes   uint // number of nodes
-	NLeaves  uint // number of leaves
-	MaxDepth uint
+	NNodes   int // number of nodes
+	NLeaves  int // number of leaves
+	MaxDepth int
 }
 
 //// distancePoints ////////////////////////////////////////////////////////////
@@ -35,6 +35,14 @@ func (p distancePoints) Less(i, j int) bool {
 
 func (p distancePoints) Swap(i, j int) {
 	p.points[i], p.points[j] = p.points[j], p.points[i]
+}
+
+//// approxInfo ////////////////////////////////////////////////////////////////
+
+type approxInfo struct {
+	k     int // number of nearest neighbors to find
+	nn    int // maximal number of nodes to visit
+	count int // nodes visited
 }
 
 //// utilities /////////////////////////////////////////////////////////////////

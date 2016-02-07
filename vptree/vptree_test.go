@@ -25,7 +25,7 @@ var (
 
 // 1-D test samples
 var (
-	set1D = []Point{
+	set1D_12 = []Point{
 		&point{0.0},
 		&point{0.025},
 		&point{0.1},
@@ -37,6 +37,32 @@ var (
 		&point{0.75},
 		&point{0.9},
 		&point{0.95},
+		&point{1.0},
+	}
+	set1D_24 = []Point{
+		&point{0.00},
+		&point{0.02},
+		&point{0.08},
+		&point{0.10},
+		&point{0.22},
+		&point{0.23},
+		&point{0.25},
+		&point{0.28},
+		&point{0.29},
+		&point{0.30},
+		&point{0.33},
+		&point{0.36},
+		&point{0.40},
+		&point{0.50},
+		&point{0.51},
+		&point{0.52},
+		&point{0.70},
+		&point{0.75},
+		&point{0.80},
+		&point{0.85},
+		&point{0.90},
+		&point{0.94},
+		&point{0.98},
 		&point{1.0},
 	}
 )
@@ -55,6 +81,7 @@ func (p point) String() string {
 	return txt
 }
 
+// euclidean
 func (p *point) Distance(to Point) float32 {
 	pto := to.(*point)
 	distance := float32(0.0)
@@ -64,6 +91,22 @@ func (p *point) Distance(to Point) float32 {
 	}
 	return float32(math.Sqrt(float64(distance)))
 }
+
+/*
+// manhattan
+func (p *point) Distance(to Point) float32 {
+	pto := to.(*point)
+	distance := float32(0.0)
+	for i := range *p {
+		d := (*p)[i] - (*pto)[i]
+		if d < 0.0 {
+			d = -d
+		}
+		distance += d
+	}
+	return distance
+}
+*/
 
 //// initialisation ////////////////////////////////////////////////////////////
 
@@ -105,14 +148,18 @@ func init() {
 
 /*
 func TestDemo(t *testing.T) {
-	for i := 0; i < 3; i++ {
-		vp := NewVPTree(set1D, uint(i))
-		//vp := NewVPTree(isamples, uint(i))
+	for i := 0; i < 10; i++ {
+		vp := NewVPTree(set1D_24, uint(i))
 		info := vp.Info()
 
 		fmt.Printf("\n%s\n", vp)
 		fmt.Printf("%d nodes, %d leaves, max depth %d\n",
 			info.NNodes, info.NLeaves, info.MaxDepth)
+
+		query := Point(&point{0.666})
+		r, d := vp.KNN(query, 1)
+		//r, d := vp.ApproximateKNN(query, 1, 3)
+		fmt.Printf("r %v, d %v\n", r, d)
 	}
 }
 */
@@ -377,7 +424,7 @@ func BenchmarkNN(b *testing.B) {
 	}
 }
 
-func BenchmarkRange01(b *testing.B) {
+func BenchmarkRange_01(b *testing.B) {
 	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -387,7 +434,7 @@ func BenchmarkRange01(b *testing.B) {
 	}
 }
 
-func BenchmarkRange02(b *testing.B) {
+func BenchmarkRange_02(b *testing.B) {
 	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -397,7 +444,7 @@ func BenchmarkRange02(b *testing.B) {
 	}
 }
 
-func BenchmarkRange04(b *testing.B) {
+func BenchmarkRange_04(b *testing.B) {
 	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -407,12 +454,52 @@ func BenchmarkRange04(b *testing.B) {
 	}
 }
 
-func BenchmarkRange08(b *testing.B) {
+func BenchmarkRange_08(b *testing.B) {
 	vp := NewVPTree(isamples, 16)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for q := range iqueries {
 			_, _ = vp.RangeNN(iqueries[q], 0.8)
+		}
+	}
+}
+
+func BenchmarkApproximate_8(b *testing.B) {
+	vp := NewVPTree(isamples, 16)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for q := range iqueries {
+			_, _ = vp.ApproximateKNN(iqueries[q], 1, 8)
+		}
+	}
+}
+
+func BenchmarkApproximate_16(b *testing.B) {
+	vp := NewVPTree(isamples, 16)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for q := range iqueries {
+			_, _ = vp.ApproximateKNN(iqueries[q], 1, 16)
+		}
+	}
+}
+
+func BenchmarkApproximate_32(b *testing.B) {
+	vp := NewVPTree(isamples, 16)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for q := range iqueries {
+			_, _ = vp.ApproximateKNN(iqueries[q], 1, 32)
+		}
+	}
+}
+
+func BenchmarkApproximate_64(b *testing.B) {
+	vp := NewVPTree(isamples, 16)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for q := range iqueries {
+			_, _ = vp.ApproximateKNN(iqueries[q], 1, 64)
 		}
 	}
 }
